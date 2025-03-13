@@ -80,12 +80,6 @@
 			} else {
 				f12elem.ReplicaInaccessibleDateTime = nil
 			}
-			if f12iter.ReplicaTableClassSummary != nil && f12iter.ReplicaTableClassSummary.TableClass != "" {
-				f12elem.ReplicaTableClassSummary.TableClass = aws.String(string(f12iter.ReplicaTableClassSummary.TableClass))
-				f12elem.ReplicaTableClassSummary.LastUpdateDateTime = &metav1.Time{Time: *f12iter.ReplicaTableClassSummary.LastUpdateDateTime}
-			} else {
-				f12elem.ReplicaTableClassSummary.TableClass = aws.String("STANDARD")
-			}
 			f12 = append(f12, f12elem)
 		}
 		ko.Status.ReplicasDescriptions = f12

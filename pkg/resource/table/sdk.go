@@ -798,7 +798,6 @@ func (rm *resourceManager) sdkCreate(
 	}
 	// Check if replicas were specified during creation
 	if desired.ko.Spec.Replicas != nil && len(desired.ko.Spec.Replicas) > 0 {
-		// Copy the replica configuration to the new resource
 		ko.Spec.Replicas = desired.ko.Spec.Replicas
 
 		// Return with a requeue to process replica updates
@@ -1017,19 +1016,13 @@ func (rm *resourceManager) sdkDelete(
 
 	// If there are replicas, we need to remove them before deleting the table
 	if r.ko.Spec.Replicas != nil && len(r.ko.Spec.Replicas) > 0 {
-		// Create a desired state with no replicas
 		desired := &resource{
 			ko: r.ko.DeepCopy(),
 		}
 		desired.ko.Spec.Replicas = nil
 
-		// Call syncReplicaUpdates to remove all replicas
 		err := rm.syncReplicaUpdates(ctx, r, desired)
 		if err != nil {
-			if err == requeueWaitWhileUpdating {
-				// This is expected - we need to wait for the replica removal to complete
-				return nil, err
-			}
 			return nil, err
 		}
 	}
@@ -1169,7 +1162,8 @@ func (rm *resourceManager) terminalAWSError(err error) bool {
 		return false
 	}
 	switch terminalErr.ErrorCode() {
-	case "InvalidParameter":
+	case "InvalidParameter",
+		"ValidationException":
 		return true
 	default:
 		return false

@@ -78,7 +78,7 @@ var (
 	)
 	requeueWaitWhileUpdating = ackrequeue.NeededAfter(
 		ErrTableUpdating,
-		5*time.Second,
+		10*time.Second,
 	)
 	requeueWaitGSIReady = ackrequeue.NeededAfter(
 		ErrTableGSIsUpdating,

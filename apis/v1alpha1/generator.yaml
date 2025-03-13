@@ -80,6 +80,7 @@ resources:
           code: ResourceNotFoundException
       terminal_codes:
         - InvalidParameter
+        - ValidationException
     update_operation:
       custom_method_name: customUpdateTable
     hooks:
