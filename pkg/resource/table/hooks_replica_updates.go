@@ -272,14 +272,14 @@ func hasStreamSpecificationWithNewAndOldImages(r *resource) bool {
 	return StreamEnabled && StreamViewType
 }
 
-// syncReplicaUpdates updates the replica configuration for a table
-func (rm *resourceManager) syncReplicaUpdates(
+// syncReplicas updates the replica configuration for a table
+func (rm *resourceManager) syncReplicas(
 	ctx context.Context,
 	latest *resource,
 	desired *resource,
 ) (err error) {
 	rlog := ackrtlog.FromContext(ctx)
-	exit := rlog.Trace("rm.syncReplicaUpdates")
+	exit := rlog.Trace("rm.syncReplicas")
 	defer func() {
 		exit(err)
 	}()
@@ -334,22 +334,22 @@ func (rm *resourceManager) newUpdateTableReplicaUpdatesOneAtATimePayload(
 	// We'll only perform one replica action at a time
 
 	if len(createReplicas) > 0 {
-		region := *createReplicas[0].RegionName
-		rlog.Debug("creating replica in region", "table", *desired.ko.Spec.TableName, "region", region)
+		replica := *createReplicas[0]
+		rlog.Debug("creating replica in region", "table", *desired.ko.Spec.TableName, "region", *replica.RegionName)
 		input.ReplicaUpdates = append(input.ReplicaUpdates, createReplicaUpdate(createReplicas[0]))
 		return input, replicasInQueue, nil
 	}
 
 	if len(updateReplicas) > 0 {
-		region := *updateReplicas[0].RegionName
-		rlog.Debug("updating replica in region", "table", *desired.ko.Spec.TableName, "region", region)
+		replica := *updateReplicas[0]
+		rlog.Debug("updating replica in region", "table", *desired.ko.Spec.TableName, "region", *replica.RegionName)
 		input.ReplicaUpdates = append(input.ReplicaUpdates, updateReplicaUpdate(updateReplicas[0]))
 		return input, replicasInQueue, nil
 	}
 
 	if len(deleteRegions) > 0 {
-		region := deleteRegions[0]
-		rlog.Debug("deleting replica in region", "table", *desired.ko.Spec.TableName, "region", region)
+		replica := deleteRegions[0]
+		rlog.Debug("deleting replica in region", "table", *desired.ko.Spec.TableName, "region", replica)
 		input.ReplicaUpdates = append(input.ReplicaUpdates, deleteReplicaUpdate(deleteRegions[0]))
 		return input, replicasInQueue, nil
 	}
@@ -367,27 +367,27 @@ func calculateReplicaUpdates(
 	updateReplicas []*v1alpha1.CreateReplicationGroupMemberAction,
 	deleteRegions []string,
 ) {
-	existingRegions := make(map[string]*v1alpha1.CreateReplicationGroupMemberAction)
-	if latest != nil && latest.ko.Spec.ReplicationGroup != nil {
-		for _, replica := range latest.ko.Spec.ReplicationGroup {
+	latestReplicas := make(map[string]*v1alpha1.CreateReplicationGroupMemberAction)
+	if latest.ko.Spec.TableReplicas != nil {
+		for _, replica := range latest.ko.Spec.TableReplicas {
 			if replica.RegionName != nil {
-				existingRegions[*replica.RegionName] = replica
+				latestReplicas[*replica.RegionName] = replica
 			}
 		}
 	}
 
-	desiredRegions := make(map[string]*v1alpha1.CreateReplicationGroupMemberAction)
-	if desired != nil && desired.ko.Spec.ReplicationGroup != nil {
-		for _, replica := range desired.ko.Spec.ReplicationGroup {
+	desiredReplicas := make(map[string]*v1alpha1.CreateReplicationGroupMemberAction)
+	if desired != nil && desired.ko.Spec.TableReplicas != nil {
+		for _, replica := range desired.ko.Spec.TableReplicas {
 			if replica.RegionName != nil {
-				desiredRegions[*replica.RegionName] = replica
+				desiredReplicas[*replica.RegionName] = replica
 			}
 		}
 	}
 
 	// Calculate replicas to create or update
-	for regionName, desiredReplica := range desiredRegions {
-		existingReplica, exists := existingRegions[regionName]
+	for desiredRegion, desiredReplica := range desiredReplicas {
+		existingReplica, exists := latestReplicas[desiredRegion]
 		if !exists {
 			createReplicas = append(createReplicas, desiredReplica)
 		} else if !equalCreateReplicationGroupMemberActions(existingReplica, desiredReplica) {
@@ -396,8 +396,8 @@ func calculateReplicaUpdates(
 	}
 
 	// Calculate regions to delete
-	for regionName := range existingRegions {
-		if _, exists := desiredRegions[regionName]; !exists {
+	for regionName := range latestReplicas {
+		if _, exists := desiredReplicas[regionName]; !exists {
 			deleteRegions = append(deleteRegions, regionName)
 		}
 	}
